@@ -23,9 +23,9 @@ const startGame = (game, description) => {
             console.log(`Let's try again, ${name}`);
             return;
         }
-        console.log('Correctomundo!');
+        console.log('Correct!');
     }
-    console.log(`Congratulations, ${name}`);
+    console.log(`Congratulations, ${name}!`);
 };
 
 export default { startGame };

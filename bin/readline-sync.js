@@ -5,69 +5,68 @@
  * Copyright (c) 2019 anseki
  * Licensed under the MIT license.
  */
+/* eslint-disable */
 
-'use strict';
+const
+  IS_WIN = process.platform === 'win32';
 
-var
-  IS_WIN = process.platform === 'win32',
+const ALGORITHM_CIPHER = 'aes-256-cbc';
+const ALGORITHM_HASH = 'sha256';
+const DEFAULT_ERR_MSG = 'The current environment doesn\'t support interactive reading from TTY.';
 
-  ALGORITHM_CIPHER = 'aes-256-cbc',
-  ALGORITHM_HASH = 'sha256',
-  DEFAULT_ERR_MSG = 'The current environment doesn\'t support interactive reading from TTY.',
+const fs = require('fs');
 
-  fs = require('fs'),
-  TTY = process.binding('tty_wrap').TTY,
-  childProc = require('child_process'),
-  pathUtil = require('path'),
+const { TTY } = process.binding('tty_wrap');
+const childProc = require('child_process');
+const pathUtil = require('path');
 
-  defaultOptions = {
-    /* eslint-disable key-spacing */
-    prompt:             '> ',
-    hideEchoBack:       false,
-    mask:               '*',
-    limit:              [],
-    limitMessage:       'Input another, please.$<( [)limit(])>',
-    defaultInput:       '',
-    trueValue:          [],
-    falseValue:         [],
-    caseSensitive:      false,
-    keepWhitespace:     false,
-    encoding:           'utf8',
-    bufferSize:         1024,
-    print:              void 0,
-    history:            true,
-    cd:                 false,
-    phContent:          void 0,
-    preCheck:           void 0
-    /* eslint-enable key-spacing */
-  },
+let defaultOptions = {
+  /* eslint-disable key-spacing */
+  prompt:             '> ',
+  hideEchoBack:       false,
+  mask:               '*',
+  limit:              [],
+  limitMessage:       'Input another, please.$<( [)limit(])>',
+  defaultInput:       '',
+  trueValue:          [],
+  falseValue:         [],
+  caseSensitive:      false,
+  keepWhitespace:     false,
+  encoding:           'utf8',
+  bufferSize:         1024,
+  print:              void 0,
+  history:            true,
+  cd:                 false,
+  phContent:          void 0,
+  preCheck:           void 0,
+  /* eslint-enable key-spacing */
+};
 
-  fdR = 'none',
-  isRawMode = false,
-  salt = 0,
-  lastInput = '',
-  inputHistory = [],
-  _DBG_useExt = false,
-  _DBG_checkOptions = false,
-  _DBG_checkMethod = false,
-  fdW, ttyR, extHostPath, extHostArgs, tempdir, rawInput;
+let fdR = 'none';
+let isRawMode = false;
+let salt = 0;
+let lastInput = '';
+let inputHistory = [];
+let _DBG_useExt = false;
+let _DBG_checkOptions = false;
+let _DBG_checkMethod = false;
+let fdW; let ttyR; let extHostPath; let extHostArgs; let tempdir; let
+  rawInput;
 
 function getHostArgs(options) {
   // Send any text to crazy Windows shell safely.
   function encodeArg(arg) {
-    return arg.replace(/[^\w\u0080-\uFFFF]/g, function(chr) {
-      return '#' + chr.charCodeAt(0) + ';';
-    });
+    return arg.replace(/[^\w\u0080-\uFFFF]/g, (chr) => `#${chr.charCodeAt(0)};`);
   }
 
-  return extHostArgs.concat((function(conf) {
-    var args = [];
-    Object.keys(conf).forEach(function(optionName) {
+  return extHostArgs.concat((function (conf) {
+    const args = [];
+    Object.keys(conf).forEach((optionName) => {
       if (conf[optionName] === 'boolean') {
-        if (options[optionName]) { args.push('--' + optionName); }
+        if (options[optionName]) { args.push(`--${optionName}`); }
       } else if (conf[optionName] === 'string') {
         if (options[optionName]) {
-          args.push('--' + optionName, encodeArg(options[optionName]));
+          args.push(`--${optionName}`, encodeArg(options[optionName]));
         }
       }
     });
@@ -80,17 +79,17 @@ function getHostArgs(options) {
     hideEchoBack:   'boolean',
     mask:           'string',
     limit:          'string',
-    caseSensitive:  'boolean'
+    caseSensitive:  'boolean',
     /* eslint-enable key-spacing */
   }));
 }
 
 // piping via files (for Node.js v0.10-)
 function _execFileSync(options, execOptions) {
-
   function getTempfile(name) {
-    var suffix = '',
-      filepath, fd;
+    let suffix = '';
+    let filepath; let
+      fd;
     tempdir = tempdir || require('os').tmpdir();
 
     while (true) {
@@ -111,16 +110,17 @@ function _execFileSync(options, execOptions) {
     return filepath;
   }
 
-  var res = {},
-    pathStdout = getTempfile('readline-sync.stdout'),
-    pathStderr = getTempfile('readline-sync.stderr'),
-    pathExit = getTempfile('readline-sync.exit'),
-    pathDone = getTempfile('readline-sync.done'),
-    crypto = require('crypto'),
-    hostArgs, shellPath, shellArgs, exitCode, extMessage, shasum, decipher, password;
+  const res = {};
+  const pathStdout = getTempfile('readline-sync.stdout');
+  const pathStderr = getTempfile('readline-sync.stderr');
+  const pathExit = getTempfile('readline-sync.exit');
+  const pathDone = getTempfile('readline-sync.done');
+  const crypto = require('crypto');
+  let hostArgs; let shellPath; let shellArgs; let exitCode; let extMessage; let shasum; let decipher; let
+    password;
 
   shasum = crypto.createHash(ALGORITHM_HASH);
-  shasum.update('' + process.pid + (salt++) + Math.random());
+  shasum.update(`${process.pid}${salt++}${Math.random()}`);
   password = shasum.digest('hex');
   decipher = crypto.createDecipher(ALGORITHM_CIPHER, password);
 
@@ -130,25 +130,25 @@ function _execFileSync(options, execOptions) {
     process.env.Q = '"'; // The quote (") that isn't escaped.
     // `()` for ignore space by echo
     shellArgs = ['/V:ON', '/S', '/C',
-      '(%Q%' + shellPath + '%Q% /V:ON /S /C %Q%' + /* ESLint bug? */ // eslint-disable-line no-path-concat
-        '%Q%' + extHostPath + '%Q%' +
-          hostArgs.map(function(arg) { return ' %Q%' + arg + '%Q%'; }).join('') +
-        ' & (echo !ERRORLEVEL!)>%Q%' + pathExit + '%Q%%Q%) 2>%Q%' + pathStderr + '%Q%' +
-      ' |%Q%' + process.execPath + '%Q% %Q%' + __dirname + '\\encrypt.js%Q%' +
-        ' %Q%' + ALGORITHM_CIPHER + '%Q% %Q%' + password + '%Q%' +
-        ' >%Q%' + pathStdout + '%Q%' +
-      ' & (echo 1)>%Q%' + pathDone + '%Q%'];
+      `(%Q%${shellPath}%Q% /V:ON /S /C %Q%` /* ESLint bug? */ // eslint-disable-line no-path-concat
+        + `%Q%${extHostPath}%Q%${
+          hostArgs.map((arg) => ` %Q%${arg}%Q%`).join('')
+        } & (echo !ERRORLEVEL!)>%Q%${pathExit}%Q%%Q%) 2>%Q%${pathStderr}%Q%`
+      + ` |%Q%${process.execPath}%Q% %Q%${__dirname}\\encrypt.js%Q%`
+        + ` %Q%${ALGORITHM_CIPHER}%Q% %Q%${password}%Q%`
+        + ` >%Q%${pathStdout}%Q%`
+      + ` & (echo 1)>%Q%${pathDone}%Q%`];
   } else {
     shellPath = '/bin/sh';
     shellArgs = ['-c',
       // Use `()`, not `{}` for `-c` (text param)
-      '("' + extHostPath + '"' + /* ESLint bug? */ // eslint-disable-line no-path-concat
-          hostArgs.map(function(arg) { return " '" + arg.replace(/'/g, "'\\''") + "'"; }).join('') +
-        '; echo $?>"' + pathExit + '") 2>"' + pathStderr + '"' +
-      ' |"' + process.execPath + '" "' + __dirname + '/encrypt.js"' +
-        ' "' + ALGORITHM_CIPHER + '" "' + password + '"' +
-        ' >"' + pathStdout + '"' +
-      '; echo 1 >"' + pathDone + '"'];
+      `("${extHostPath}"${/* ESLint bug? */ // eslint-disable-line no-path-concat
+        hostArgs.map((arg) => ` '${arg.replace(/'/g, "'\\''")}'`).join('')
+      }; echo $?>"${pathExit}") 2>"${pathStderr}"`
+      + ` |"${process.execPath}" "${__dirname}/encrypt.js"`
+        + ` "${ALGORITHM_CIPHER}" "${password}"`
+        + ` >"${pathStdout}"`
+      + `; echo 1 >"${pathDone}"`];
   }
   if (_DBG_checkMethod) { _DBG_checkMethod('_execFileSync', hostArgs); }
   try {
@@ -160,16 +160,14 @@ function _execFileSync(options, execOptions) {
     res.error.args = shellArgs;
   }
 
-  while (fs.readFileSync(pathDone, {encoding: options.encoding}).trim() !== '1') {} // eslint-disable-line no-empty
-  if ((exitCode =
-      fs.readFileSync(pathExit, {encoding: options.encoding}).trim()) === '0') {
-    res.input =
-      decipher.update(fs.readFileSync(pathStdout, {encoding: 'binary'}),
-        'hex', options.encoding) +
-      decipher.final(options.encoding);
+  while (fs.readFileSync(pathDone, { encoding: options.encoding }).trim() !== '1') {} // eslint-disable-line no-empty
+  if ((exitCode = fs.readFileSync(pathExit, { encoding: options.encoding }).trim()) === '0') {
+    res.input = decipher.update(fs.readFileSync(pathStdout, { encoding: 'binary' }),
+      'hex', options.encoding)
+      + decipher.final(options.encoding);
   } else {
-    extMessage = fs.readFileSync(pathStderr, {encoding: options.encoding}).trim();
-    res.error = new Error(DEFAULT_ERR_MSG + (extMessage ? '\n' + extMessage : ''));
+    extMessage = fs.readFileSync(pathStderr, { encoding: options.encoding }).trim();
+    res.error = new Error(DEFAULT_ERR_MSG + (extMessage ? `\n${extMessage}` : ''));
     res.error.method = '_execFileSync';
     res.error.program = shellPath;
     res.error.args = shellArgs;
@@ -186,23 +184,24 @@ function _execFileSync(options, execOptions) {
 }
 
 function readlineExt(options) {
-  var res = {},
-    execOptions = {env: process.env, encoding: options.encoding},
-    hostArgs, extMessage;
+  let res = {};
+  const execOptions = { env: process.env, encoding: options.encoding };
+  let hostArgs; let
+    extMessage;
 
   if (!extHostPath) {
     if (IS_WIN) {
       if (process.env.PSModulePath) { // Windows PowerShell
         extHostPath = 'powershell.exe';
         extHostArgs = ['-ExecutionPolicy', 'Bypass',
-          '-File', __dirname + '\\read.ps1']; // eslint-disable-line no-path-concat
+          '-File', `${__dirname}\\read.ps1`]; // eslint-disable-line no-path-concat
       } else { // Windows Script Host
         extHostPath = 'cscript.exe';
-        extHostArgs = ['//nologo', __dirname + '\\read.wsh.js']; // eslint-disable-line no-path-concat
+        extHostArgs = ['//nologo', `${__dirname}\\read.wsh.js`]; // eslint-disable-line no-path-concat
       }
     } else {
       extHostPath = '/bin/sh';
-      extHostArgs = [__dirname + '/read.sh']; // eslint-disable-line no-path-concat
+      extHostArgs = [`${__dirname}/read.sh`]; // eslint-disable-line no-path-concat
     }
   }
   if (IS_WIN && !process.env.PSModulePath) { // Windows Script Host
@@ -217,8 +216,8 @@ function readlineExt(options) {
     try {
       res.input = childProc.execFileSync(extHostPath, hostArgs, execOptions);
     } catch (e) { // non-zero exit code
-      extMessage = e.stderr ? (e.stderr + '').trim() : '';
-      res.error = new Error(DEFAULT_ERR_MSG + (extMessage ? '\n' + extMessage : ''));
+      extMessage = e.stderr ? (`${e.stderr}`).trim() : '';
+      res.error = new Error(DEFAULT_ERR_MSG + (extMessage ? `\n${extMessage}` : ''));
       res.error.method = 'execFileSync';
       res.error.program = extHostPath;
       res.error.args = hostArgs;
@@ -250,20 +249,21 @@ function readlineExt(options) {
   encoding, bufferSize, print
 */
 function _readlineSync(options) {
-  var input = '',
-    displaySave = options.display,
-    silent = !options.display && options.keyIn && options.hideEchoBack && !options.mask;
+  let input = '';
+  const displaySave = options.display;
+  const silent = !options.display && options.keyIn && options.hideEchoBack && !options.mask;
 
   function tryExt() {
-    var res = readlineExt(options);
+    const res = readlineExt(options);
     if (res.error) { throw res.error; }
     return res.input;
   }
 
   if (_DBG_checkOptions) { _DBG_checkOptions(options); }
 
-  (function() { // open TTY
-    var fsB, constants, verNum;
+  (function () { // open TTY
+    let fsB; let constants; let
+      verNum;
 
     function getFsB() {
       if (!fsB) {
@@ -285,16 +285,16 @@ function _readlineSync(options) {
       // Fixed v5.1.0
       // Fixed v4.2.4
       // It regressed again in v5.6.0, it is fixed in v6.2.0.
-      verNum = (function(ver) { // getVerNum
-        var nums = ver.replace(/^\D+/, '').split('.');
-        var verNum = 0;
+      verNum = (function (ver) { // getVerNum
+        const nums = ver.replace(/^\D+/, '').split('.');
+        let verNum = 0;
         if ((nums[0] = +nums[0])) { verNum += nums[0] * 10000; }
         if ((nums[1] = +nums[1])) { verNum += nums[1] * 100; }
         if ((nums[2] = +nums[2])) { verNum += nums[2]; }
         return verNum;
-      })(process.version);
-      if (!(verNum >= 20302 && verNum < 40204 || verNum >= 50000 && verNum < 50100 || verNum >= 50600 && verNum < 60200) &&
-          process.stdin.isTTY) {
+      }(process.version));
+      if (!(verNum >= 20302 && verNum < 40204 || verNum >= 50000 && verNum < 50100 || verNum >= 50600 && verNum < 60200)
+          && process.stdin.isTTY) {
         process.stdin.pause();
         fdR = process.stdin.fd;
         ttyR = process.stdin._handle;
@@ -302,7 +302,7 @@ function _readlineSync(options) {
         try {
           // The stream by fs.openSync('\\\\.\\CON', 'r') can't switch to raw mode.
           // 'CONIN$' might fail on XP, 2000, 7 (x86).
-          fdR = getFsB().open('CONIN$', constants.O_RDWR, parseInt('0666', 8));
+          fdR = getFsB().open('CONIN$', constants.O_RDWR, 0o0666);
           ttyR = new TTY(fdR, true);
         } catch (e) { /* ignore */ }
       }
@@ -315,11 +315,10 @@ function _readlineSync(options) {
         } catch (e) { /* ignore */ }
         if (typeof fdW !== 'number') { // Retry
           try {
-            fdW = getFsB().open('CONOUT$', constants.O_RDWR, parseInt('0666', 8));
+            fdW = getFsB().open('CONOUT$', constants.O_RDWR, 0o0666);
           } catch (e) { /* ignore */ }
         }
       }
-
     } else {
       if (process.stdin.isTTY) {
         process.stdin.pause();
@@ -343,11 +342,12 @@ function _readlineSync(options) {
         } catch (e) { /* ignore */ }
       }
     }
-  })();
+  }());
 
-  (function() { // try read
-    var isCooked = !options.hideEchoBack && !options.keyIn,
-      atEol, limit, buffer, reqSize, readSize, chunk, line;
+  (function () { // try read
+    const isCooked = !options.hideEchoBack && !options.keyIn;
+    let atEol; let limit; let buffer; let reqSize; let readSize; let chunk; let
+      line;
     rawInput = '';
 
     // Node.js v0.10- returns an error if same mode is set.
@@ -358,8 +358,8 @@ function _readlineSync(options) {
       return true;
     }
 
-    if (_DBG_useExt || !ttyR ||
-        typeof fdW !== 'number' && (options.display || !isCooked)) {
+    if (_DBG_useExt || !ttyR
+        || typeof fdW !== 'number' && (options.display || !isCooked)) {
       input = tryExt();
       return;
     }
@@ -380,8 +380,8 @@ function _readlineSync(options) {
     buffer = Buffer.allocUnsafe && Buffer.alloc ? Buffer.alloc(reqSize) : new Buffer(reqSize);
 
     if (options.keyIn && options.limit) {
-      limit = new RegExp('[^' + options.limit + ']',
-        'g' + (options.caseSensitive ? '' : 'i'));
+      limit = new RegExp(`[^${options.limit}]`,
+        `g${options.caseSensitive ? '' : 'i'}`);
     }
 
     while (true) {
@@ -424,30 +424,30 @@ function _readlineSync(options) {
         input += chunk;
       }
 
-      if (!options.keyIn && atEol ||
-        options.keyIn && input.length >= reqSize) { break; }
+      if (!options.keyIn && atEol
+        || options.keyIn && input.length >= reqSize) { break; }
     }
 
     if (!isCooked && !silent) { fs.writeSync(fdW, '\n'); }
     setRawMode(false);
-  })();
+  }());
 
   if (options.print && !silent) {
     options.print(
       displaySave + (
-        options.displayOnly ? '' : (
-          options.hideEchoBack ? (new Array(input.length + 1)).join(options.mask) : input
-        ) + '\n' // must at least write '\n'
+        options.displayOnly ? '' : `${options.hideEchoBack ? (new Array(input.length + 1)).join(options.mask) : input
+        }\n` // must at least write '\n'
       ),
-      options.encoding);
+      options.encoding,
+    );
   }
 
-  return options.displayOnly ? '' :
-    (lastInput = options.keepWhitespace || options.keyIn ? input : input.trim());
+  return options.displayOnly ? ''
+    : (lastInput = options.keepWhitespace || options.keyIn ? input : input.trim());
 }
 
 function flattenArray(array, validator) {
-  var flatArray = [];
+  const flatArray = [];
   function _flattenArray(array) {
     if (array == null) { return; }
     if (Array.isArray(array)) {
@@ -462,15 +462,16 @@ function flattenArray(array, validator) {
 
 function escapePattern(pattern) {
   return pattern.replace(/[\x00-\x7f]/g, // eslint-disable-line no-control-regex
-    function(s) { return '\\x' + ('00' + s.charCodeAt().toString(16)).substr(-2); });
+    (s) => `\\x${(`00${s.charCodeAt().toString(16)}`).substr(-2)}`);
 }
 
 // mergeOptions(options1, options2 ... )
 // mergeOptions(true, options1, options2 ... )
 //    arg1=true : Start from defaultOptions and pick elements of that.
 function mergeOptions() {
-  var optionsList = Array.prototype.slice.call(arguments),
-    optionNames, fromDefault;
+  const optionsList = Array.prototype.slice.call(arguments);
+  let optionNames; let
+    fromDefault;
 
   if (optionsList.length && typeof optionsList[0] === 'boolean') {
     fromDefault = optionsList.shift();
@@ -480,25 +481,25 @@ function mergeOptions() {
     }
   }
 
-  return optionsList.reduce(function(options, optionsPart) {
+  return optionsList.reduce((options, optionsPart) => {
     if (optionsPart == null) { return options; }
 
     // ======== DEPRECATED ========
-    if (optionsPart.hasOwnProperty('noEchoBack') &&
-        !optionsPart.hasOwnProperty('hideEchoBack')) {
+    if (optionsPart.hasOwnProperty('noEchoBack')
+        && !optionsPart.hasOwnProperty('hideEchoBack')) {
       optionsPart.hideEchoBack = optionsPart.noEchoBack;
       delete optionsPart.noEchoBack;
     }
-    if (optionsPart.hasOwnProperty('noTrim') &&
-        !optionsPart.hasOwnProperty('keepWhitespace')) {
+    if (optionsPart.hasOwnProperty('noTrim')
+        && !optionsPart.hasOwnProperty('keepWhitespace')) {
       optionsPart.keepWhitespace = optionsPart.noTrim;
       delete optionsPart.noTrim;
     }
     // ======== /DEPRECATED ========
 
     if (!fromDefault) { optionNames = Object.keys(optionsPart); }
-    optionNames.forEach(function(optionName) {
-      var value;
+    optionNames.forEach((optionName) => {
+      let value;
       if (!optionsPart.hasOwnProperty(optionName)) { return; }
       value = optionsPart[optionName];
       /* eslint-disable no-multi-spaces */
@@ -509,7 +510,7 @@ function mergeOptions() {
         case 'limitMessage':                //      *
         case 'defaultInput':                //      *
         case 'encoding':                    // *    *
-          value = value != null ? value + '' : '';
+          value = value != null ? `${value}` : '';
           if (value && optionName !== 'limitMessage') { value = value.replace(/[\r\n]/g, ''); }
           options[optionName] = value;
           break;
@@ -533,13 +534,11 @@ function mergeOptions() {
         case 'limit':                       // *    *     to string for readlineExt
         case 'trueValue':                   //      *
         case 'falseValue':                  //      *
-          options[optionName] = flattenArray(value, function(value) {
-            var type = typeof value;
-            return type === 'string' || type === 'number' ||
-              type === 'function' || value instanceof RegExp;
-          }).map(function(value) {
-            return typeof value === 'string' ? value.replace(/[\r\n]/g, '') : value;
-          });
+          options[optionName] = flattenArray(value, (value) => {
+            const type = typeof value;
+            return type === 'string' || type === 'number'
+              || type === 'function' || value instanceof RegExp;
+          }).map((value) => (typeof value === 'string' ? value.replace(/[\r\n]/g, '') : value));
           break;
         // ================ function
         case 'print':                       // *    *
@@ -561,35 +560,36 @@ function mergeOptions() {
 }
 
 function isMatched(res, comps, caseSensitive) {
-  return comps.some(function(comp) {
-    var type = typeof comp;
+  return comps.some((comp) => {
+    const type = typeof comp;
     return type === 'string'
-      ? (caseSensitive ? res === comp : res.toLowerCase() === comp.toLowerCase()) :
-      type === 'number' ? parseFloat(res) === comp :
-      type === 'function' ? comp(res) :
-      comp instanceof RegExp ? comp.test(res) : false;
+      ? (caseSensitive ? res === comp : res.toLowerCase() === comp.toLowerCase())
+      : type === 'number' ? parseFloat(res) === comp
+        : type === 'function' ? comp(res)
+          : comp instanceof RegExp ? comp.test(res) : false;
   });
 }
 
 function replaceHomePath(path, expand) {
-  var homePath = pathUtil.normalize(
-    IS_WIN ? (process.env.HOMEDRIVE || '') + (process.env.HOMEPATH || '') :
-    process.env.HOME || '').replace(/[/\\]+$/, '');
+  const homePath = pathUtil.normalize(
+    IS_WIN ? (process.env.HOMEDRIVE || '') + (process.env.HOMEPATH || '')
+      : process.env.HOME || '',
+  ).replace(/[/\\]+$/, '');
   path = pathUtil.normalize(path);
-  return expand ? path.replace(/^~(?=\/|\\|$)/, homePath) :
-    path.replace(new RegExp('^' + escapePattern(homePath) +
-      '(?=\\/|\\\\|$)', IS_WIN ? 'i' : ''), '~');
+  return expand ? path.replace(/^~(?=\/|\\|$)/, homePath)
+    : path.replace(new RegExp(`^${escapePattern(homePath)
+    }(?=\\/|\\\\|$)`, IS_WIN ? 'i' : ''), '~');
 }
 
 function replacePlaceholder(text, generator) {
-  var PTN_INNER = '(?:\\(([\\s\\S]*?)\\))?(\\w+|.-.)(?:\\(([\\s\\S]*?)\\))?',
-    rePlaceholder = new RegExp('(\\$)?(\\$<' + PTN_INNER + '>)', 'g'),
-    rePlaceholderCompat = new RegExp('(\\$)?(\\$\\{' + PTN_INNER + '\\})', 'g');
+  const PTN_INNER = '(?:\\(([\\s\\S]*?)\\))?(\\w+|.-.)(?:\\(([\\s\\S]*?)\\))?';
+  const rePlaceholder = new RegExp(`(\\$)?(\\$<${PTN_INNER}>)`, 'g');
+  const rePlaceholderCompat = new RegExp(`(\\$)?(\\$\\{${PTN_INNER}\\})`, 'g');
 
   function getPlaceholderText(s, escape, placeholder, pre, param, post) {
-    var text;
-    return escape || typeof (text = generator(param)) !== 'string' ? placeholder :
-      text ? (pre || '') + text + (post || '') : '';
+    let text;
+    return escape || typeof (text = generator(param)) !== 'string' ? placeholder
+      : text ? (pre || '') + text + (post || '') : '';
   }
 
   return text.replace(rePlaceholder, getPlaceholderText)
@@ -597,14 +597,15 @@ function replacePlaceholder(text, generator) {
 }
 
 function array2charlist(array, caseSensitive, collectSymbols) {
-  var group = [],
-    groupClass = -1,
-    charCode = 0,
-    symbols = '',
-    values, suppressed;
+  let group = [];
+  let groupClass = -1;
+  let charCode = 0;
+  let symbols = '';
+  let values; let
+    suppressed;
   function addGroup(groups, group) {
     if (group.length > 3) { // ellipsis
-      groups.push(group[0] + '...' + group[group.length - 1]);
+      groups.push(`${group[0]}...${group[group.length - 1]}`);
       suppressed = true;
     } else if (group.length) {
       groups = groups.concat(group);
@@ -612,19 +613,18 @@ function array2charlist(array, caseSensitive, collectSymbols) {
     return groups;
   }
 
-  values = array.reduce(function(chars, value) {
-    return chars.concat((value + '').split(''));
-  }, []).reduce(function(groups, curChar) {
-    var curGroupClass, curCharCode;
+  values = array.reduce((chars, value) => chars.concat((`${value}`).split('')), []).reduce((groups, curChar) => {
+    let curGroupClass; let
+      curCharCode;
     if (!caseSensitive) { curChar = curChar.toLowerCase(); }
-    curGroupClass = /^\d$/.test(curChar) ? 1 :
-      /^[A-Z]$/.test(curChar) ? 2 : /^[a-z]$/.test(curChar) ? 3 : 0;
+    curGroupClass = /^\d$/.test(curChar) ? 1
+      : /^[A-Z]$/.test(curChar) ? 2 : /^[a-z]$/.test(curChar) ? 3 : 0;
     if (collectSymbols && curGroupClass === 0) {
       symbols += curChar;
     } else {
       curCharCode = curChar.charCodeAt(0);
-      if (curGroupClass && curGroupClass === groupClass &&
-          curCharCode === charCode + 1) {
+      if (curGroupClass && curGroupClass === groupClass
+          && curCharCode === charCode + 1) {
         group.push(curChar);
       } else {
         groups = addGroup(groups, group);
@@ -637,7 +637,7 @@ function array2charlist(array, caseSensitive, collectSymbols) {
   }, []);
   values = addGroup(values, group); // last group
   if (symbols) { values.push(symbols); suppressed = true; }
-  return {values: values, suppressed: suppressed};
+  return { values, suppressed };
 }
 
 function joinChunks(chunks, suppressed) {
@@ -645,8 +645,9 @@ function joinChunks(chunks, suppressed) {
 }
 
 function getPhContent(param, options) {
-  var resCharlist = {},
-    text, values, arg;
+  let resCharlist = {};
+  let text; let values; let
+    arg;
   if (options.phContent) {
     text = options.phContent(param, options);
   }
@@ -661,9 +662,9 @@ function getPhContent(param, options) {
       case 'bufferSize':
       case 'history':
       case 'cd':
-        text = !options.hasOwnProperty(param) ? '' :
-          typeof options[param] === 'boolean' ? (options[param] ? 'on' : 'off') :
-          options[param] + '';
+        text = !options.hasOwnProperty(param) ? ''
+          : typeof options[param] === 'boolean' ? (options[param] ? 'on' : 'off')
+            : `${options[param]}`;
         break;
       // case 'prompt':
       // case 'query':
@@ -673,13 +674,13 @@ function getPhContent(param, options) {
       case 'limit':
       case 'trueValue':
       case 'falseValue':
-        values = options[options.hasOwnProperty(param + 'Src') ? param + 'Src' : param];
+        values = options[options.hasOwnProperty(`${param}Src`) ? `${param}Src` : param];
         if (options.keyIn) { // suppress
           resCharlist = array2charlist(values, options.caseSensitive);
           values = resCharlist.values;
         } else {
-          values = values.filter(function(value) {
-            var type = typeof value;
+          values = values.filter((value) => {
+            const type = typeof value;
             return type === 'string' || type === 'number';
           });
         }
@@ -688,7 +689,7 @@ function getPhContent(param, options) {
       case 'limitCount':
       case 'limitCountNotZero':
         text = options[options.hasOwnProperty('limitSrc') ? 'limitSrc' : 'limit'].length;
-        text = text || param !== 'limitCountNotZero' ? text + '' : '';
+        text = text || param !== 'limitCountNotZero' ? `${text}` : '';
         break;
       case 'lastInput':
         text = lastInput;
@@ -707,9 +708,9 @@ function getPhContent(param, options) {
       case 'time':
       case 'localeDate':
       case 'localeTime':
-        text = (new Date())['to' +
-          param.replace(/^./, function(str) { return str.toUpperCase(); }) +
-          'String']();
+        text = (new Date())[`to${
+          param.replace(/^./, (str) => str.toUpperCase())
+        }String`]();
         break;
       default: // with arg
         if (typeof (arg = (param.match(/^history_m(\d+)$/) || [])[1]) === 'string') {
@@ -721,9 +722,10 @@ function getPhContent(param, options) {
 }
 
 function getPhCharlist(param) {
-  var matches = /^(.)-(.)$/.exec(param),
-    text = '',
-    from, to, code, step;
+  const matches = /^(.)-(.)$/.exec(param);
+  let text = '';
+  let from; let to; let code; let
+    step;
   if (!matches) { return null; }
   from = matches[1].charCodeAt(0);
   to = matches[2].charCodeAt(0);
@@ -734,10 +736,11 @@ function getPhCharlist(param) {
 
 // cmd "arg" " a r g " "" 'a"r"g' "a""rg" "arg
 function parseCl(cl) {
-  var reToken = new RegExp(/(\s*)(?:("|')(.*?)(?:\2|$)|(\S+))/g),
-    taken = '',
-    args = [],
-    matches, part;
+  const reToken = new RegExp(/(\s*)(?:("|')(.*?)(?:\2|$)|(\S+))/g);
+  let taken = '';
+  const args = [];
+  let matches; let
+    part;
   cl = cl.trim();
   while ((matches = reToken.exec(cl))) {
     part = matches[3] || matches[4] || '';
@@ -753,15 +756,16 @@ function parseCl(cl) {
 
 function toBool(res, options) {
   return (
-    (options.trueValue.length &&
-      isMatched(res, options.trueValue, options.caseSensitive)) ? true :
-    (options.falseValue.length &&
-      isMatched(res, options.falseValue, options.caseSensitive)) ? false : res);
+    (options.trueValue.length
+      && isMatched(res, options.trueValue, options.caseSensitive)) ? true
+      : (options.falseValue.length
+      && isMatched(res, options.falseValue, options.caseSensitive)) ? false : res);
 }
 
 function getValidLine(options) {
-  var res, forceNext, limitMessage,
-    matches, histInput, args, resCheck;
+  let res; let forceNext; let limitMessage;
+  let matches; let histInput; let args; let
+    resCheck;
 
   function _getPhContent(param) { return getPhContent(param, options); }
   function addDisplay(text) { options.display += (/[^\r\n]$/.test(options.display) ? '\n' : '') + text; }
@@ -769,7 +773,7 @@ function getValidLine(options) {
   options.limitSrc = options.limit;
   options.displaySrc = options.display;
   options.limit = ''; // for readlineExt
-  options.display = replacePlaceholder(options.display + '', _getPhContent);
+  options.display = replacePlaceholder(`${options.display}`, _getPhContent);
 
   while (true) {
     res = _readlineSync(options);
@@ -787,7 +791,7 @@ function getValidLine(options) {
           res = histInput;
         }
         // Show it even if it is empty (NL only).
-        addDisplay(histInput + '\n');
+        addDisplay(`${histInput}\n`);
         if (!forceNext) { // Loop may break
           options.displayOnly = true;
           _readlineSync(options);
@@ -806,7 +810,7 @@ function getValidLine(options) {
             try {
               process.chdir(replaceHomePath(args[1], true));
             } catch (e) {
-              addDisplay(e + '');
+              addDisplay(`${e}`);
             }
           }
           forceNext = true;
@@ -826,84 +830,82 @@ function getValidLine(options) {
     }
 
     if (!forceNext) {
-      if (!options.limitSrc.length ||
-        isMatched(res, options.limitSrc, options.caseSensitive)) { break; }
+      if (!options.limitSrc.length
+        || isMatched(res, options.limitSrc, options.caseSensitive)) { break; }
       if (options.limitMessage) {
         limitMessage = replacePlaceholder(options.limitMessage, _getPhContent);
       }
     }
 
-    addDisplay((limitMessage ? limitMessage + '\n' : '') +
-      replacePlaceholder(options.displaySrc + '', _getPhContent));
+    addDisplay((limitMessage ? `${limitMessage}\n` : '')
+      + replacePlaceholder(`${options.displaySrc}`, _getPhContent));
   }
   return toBool(res, options);
 }
 
 // for dev
-exports._DBG_set_useExt = function(val) { _DBG_useExt = val; };
-exports._DBG_set_checkOptions = function(val) { _DBG_checkOptions = val; };
-exports._DBG_set_checkMethod = function(val) { _DBG_checkMethod = val; };
-exports._DBG_clearHistory = function() { lastInput = ''; inputHistory = []; };
+exports._DBG_set_useExt = function (val) { _DBG_useExt = val; };
+exports._DBG_set_checkOptions = function (val) { _DBG_checkOptions = val; };
+exports._DBG_set_checkMethod = function (val) { _DBG_checkMethod = val; };
+exports._DBG_clearHistory = function () { lastInput = ''; inputHistory = []; };
 
 // ------------------------------------
 
-exports.setDefaultOptions = function(options) {
+exports.setDefaultOptions = function (options) {
   defaultOptions = mergeOptions(true, options);
   return mergeOptions(true); // copy
 };
 
-exports.question = function(query, options) {
+exports.question = function (query, options) {
   /* eslint-disable key-spacing */
   return getValidLine(mergeOptions(mergeOptions(true, options), {
-    display:            query
+    display:            query,
   }));
   /* eslint-enable key-spacing */
 };
 
-exports.prompt = function(options) {
-  var readOptions = mergeOptions(true, options);
+exports.prompt = function (options) {
+  const readOptions = mergeOptions(true, options);
   readOptions.display = readOptions.prompt;
   return getValidLine(readOptions);
 };
 
-exports.keyIn = function(query, options) {
+exports.keyIn = function (query, options) {
   /* eslint-disable key-spacing */
-  var readOptions = mergeOptions(mergeOptions(true, options), {
+  const readOptions = mergeOptions(mergeOptions(true, options), {
     display:            query,
     keyIn:              true,
-    keepWhitespace:     true
+    keepWhitespace:     true,
   });
   /* eslint-enable key-spacing */
 
   // char list
-  readOptions.limitSrc = readOptions.limit.filter(function(value) {
-    var type = typeof value;
+  readOptions.limitSrc = readOptions.limit.filter((value) => {
+    const type = typeof value;
     return type === 'string' || type === 'number';
-  }).map(function(text) {
-    return replacePlaceholder(text + '', getPhCharlist);
-  });
+  }).map((text) => replacePlaceholder(`${text}`, getPhCharlist));
   // pattern
   readOptions.limit = escapePattern(readOptions.limitSrc.join(''));
 
-  ['trueValue', 'falseValue'].forEach(function(optionName) {
-    readOptions[optionName] = readOptions[optionName].reduce(function(comps, comp) {
-      var type = typeof comp;
+  ['trueValue', 'falseValue'].forEach((optionName) => {
+    readOptions[optionName] = readOptions[optionName].reduce((comps, comp) => {
+      const type = typeof comp;
       if (type === 'string' || type === 'number') {
-        comps = comps.concat((comp + '').split(''));
+        comps = comps.concat((`${comp}`).split(''));
       } else { comps.push(comp); }
       return comps;
     }, []);
   });
 
-  readOptions.display = replacePlaceholder(readOptions.display + '',
-    function(param) { return getPhContent(param, readOptions); });
+  readOptions.display = replacePlaceholder(`${readOptions.display}`,
+    (param) => getPhContent(param, readOptions));
 
   return toBool(_readlineSync(readOptions), readOptions);
 };
 
 // ------------------------------------
 
-exports.questionEMail = function(query, options) {
+exports.questionEMail = function (query, options) {
   if (query == null) { query = 'Input e-mail address: '; }
   /* eslint-disable key-spacing */
   return exports.question(query, mergeOptions({
@@ -913,57 +915,59 @@ exports.questionEMail = function(query, options) {
     limit:              /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/,
     limitMessage:       'Input valid e-mail address, please.',
     trueValue:          null,
-    falseValue:         null
+    falseValue:         null,
   }, options, {
     // -------- forced
     keepWhitespace:     false,
-    cd:                 false
+    cd:                 false,
   }));
   /* eslint-enable key-spacing */
 };
 
-exports.questionNewPassword = function(query, options) {
+exports.questionNewPassword = function (query, options) {
   /* eslint-disable key-spacing */
-  var resCharlist, min, max,
-    readOptions = mergeOptions({
-      // -------- default
-      hideEchoBack:       true,
-      mask:               '*',
-      limitMessage:       'It can include: $<charlist>\n' +
-                            'And the length must be: $<length>',
-      trueValue:          null,
-      falseValue:         null,
-      caseSensitive:      true
-    }, options, {
-      // -------- forced
-      history:            false,
-      cd:                 false,
-      // limit (by charlist etc.),
-      phContent: function(param) {
-        return param === 'charlist' ? resCharlist.text :
-          param === 'length' ? min + '...' + max : null;
-      }
-    }),
+  let resCharlist; let min; let max;
+  const readOptions = mergeOptions({
+    // -------- default
+    hideEchoBack:       true,
+    mask:               '*',
+    limitMessage:       'It can include: $<charlist>\n'
+                            + 'And the length must be: $<length>',
+    trueValue:          null,
+    falseValue:         null,
+    caseSensitive:      true,
+  }, options, {
+    // -------- forced
+    history:            false,
+    cd:                 false,
+    // limit (by charlist etc.),
+    phContent(param) {
+      return param === 'charlist' ? resCharlist.text
+        : param === 'length' ? `${min}...${max}` : null;
+    },
+  });
     // added:     charlist, min, max, confirmMessage, unmatchMessage
-    charlist, confirmMessage, unmatchMessage,
-    limit, limitMessage, res1, res2;
+  let charlist; let confirmMessage; let unmatchMessage;
+  let limit; let limitMessage; let res1; let
+    res2;
   /* eslint-enable key-spacing */
   options = options || {};
 
   charlist = replacePlaceholder(
-    options.charlist ? options.charlist + '' : '$<!-~>', getPhCharlist);
+    options.charlist ? `${options.charlist}` : '$<!-~>', getPhCharlist,
+  );
   if (isNaN(min = parseInt(options.min, 10)) || typeof min !== 'number') { min = 12; }
   if (isNaN(max = parseInt(options.max, 10)) || typeof max !== 'number') { max = 24; }
-  limit = new RegExp('^[' + escapePattern(charlist) +
-    ']{' + min + ',' + max + '}$');
+  limit = new RegExp(`^[${escapePattern(charlist)
+  }]{${min},${max}}$`);
   resCharlist = array2charlist([charlist], readOptions.caseSensitive, true);
   resCharlist.text = joinChunks(resCharlist.values, resCharlist.suppressed);
 
-  confirmMessage = options.confirmMessage != null ? options.confirmMessage :
-    'Reinput a same one to confirm it: ';
-  unmatchMessage = options.unmatchMessage != null ? options.unmatchMessage :
-    'It differs from first one.' +
-      ' Hit only the Enter key if you want to retry from first one.';
+  confirmMessage = options.confirmMessage != null ? options.confirmMessage
+    : 'Reinput a same one to confirm it: ';
+  unmatchMessage = options.unmatchMessage != null ? options.unmatchMessage
+    : 'It differs from first one.'
+      + ' Hit only the Enter key if you want to retry from first one.';
 
   if (query == null) { query = 'Input new password: '; }
 
@@ -982,7 +986,7 @@ exports.questionNewPassword = function(query, options) {
 };
 
 function _questionNum(query, options, parser) {
-  var validValue;
+  let validValue;
   function getValidValue(value) {
     validValue = parser(value);
     return !isNaN(validValue) && typeof validValue === 'number';
@@ -990,107 +994,108 @@ function _questionNum(query, options, parser) {
   /* eslint-disable key-spacing */
   exports.question(query, mergeOptions({
     // -------- default
-    limitMessage:       'Input valid number, please.'
+    limitMessage:       'Input valid number, please.',
   }, options, {
     // -------- forced
     limit:              getValidValue,
-    cd:                 false
+    cd:                 false,
     // trueValue, falseValue, caseSensitive, keepWhitespace don't work.
   }));
   /* eslint-enable key-spacing */
   return validValue;
 }
-exports.questionInt = function(query, options) {
-  return _questionNum(query, options, function(value) { return parseInt(value, 10); });
+exports.questionInt = function (query, options) {
+  return _questionNum(query, options, (value) => parseInt(value, 10));
 };
-exports.questionFloat = function(query, options) {
+exports.questionFloat = function (query, options) {
   return _questionNum(query, options, parseFloat);
 };
 
-exports.questionPath = function(query, options) {
+exports.questionPath = function (query, options) {
   /* eslint-disable key-spacing */
-  var error = '',
-    validPath, // before readOptions
-    readOptions = mergeOptions({
-      // -------- default
-      hideEchoBack:       false,
-      limitMessage:       '$<error(\n)>Input valid path, please.' +
-                            '$<( Min:)min>$<( Max:)max>',
-      history:            true,
-      cd:                 true
-    }, options, {
-      // -------- forced
-      keepWhitespace:     false,
-      limit: function(value) {
-        var exists, stat, res;
-        value = replaceHomePath(value, true);
-        error = ''; // for validate
-        // mkdir -p
-        function mkdirParents(dirPath) {
-          dirPath.split(/\/|\\/).reduce(function(parents, dir) {
-            var path = pathUtil.resolve((parents += dir + pathUtil.sep));
-            if (!fs.existsSync(path)) {
-              fs.mkdirSync(path);
-            } else if (!fs.statSync(path).isDirectory()) {
-              throw new Error('Non directory already exists: ' + path);
-            }
-            return parents;
-          }, '');
-        }
+  let error = '';
+  let validPath; // before readOptions
+  const readOptions = mergeOptions({
+    // -------- default
+    hideEchoBack:       false,
+    limitMessage:       '$<error(\n)>Input valid path, please.'
+                            + '$<( Min:)min>$<( Max:)max>',
+    history:            true,
+    cd:                 true,
+  }, options, {
+    // -------- forced
+    keepWhitespace:     false,
+    limit(value) {
+      let exists; let stat; let
+        res;
+      value = replaceHomePath(value, true);
+      error = ''; // for validate
+      // mkdir -p
+      function mkdirParents(dirPath) {
+        dirPath.split(/\/|\\/).reduce((parents, dir) => {
+          const path = pathUtil.resolve((parents += dir + pathUtil.sep));
+          if (!fs.existsSync(path)) {
+            fs.mkdirSync(path);
+          } else if (!fs.statSync(path).isDirectory()) {
+            throw new Error(`Non directory already exists: ${path}`);
+          }
+          return parents;
+        }, '');
+      }
 
-        try {
-          exists = fs.existsSync(value);
-          validPath = exists ? fs.realpathSync(value) : pathUtil.resolve(value);
-          // options.exists default: true, not-bool: no-check
-          if (!options.hasOwnProperty('exists') && !exists ||
-              typeof options.exists === 'boolean' && options.exists !== exists) {
-            error = (exists ? 'Already exists' : 'No such file or directory') +
-              ': ' + validPath;
-            return false;
-          }
-          if (!exists && options.create) {
-            if (options.isDirectory) {
-              mkdirParents(validPath);
-            } else {
-              mkdirParents(pathUtil.dirname(validPath));
-              fs.closeSync(fs.openSync(validPath, 'w')); // touch
-            }
-            validPath = fs.realpathSync(validPath);
-          }
-          if (exists && (options.min || options.max ||
-              options.isFile || options.isDirectory)) {
-            stat = fs.statSync(validPath);
-            // type check first (directory has zero size)
-            if (options.isFile && !stat.isFile()) {
-              error = 'Not file: ' + validPath;
-              return false;
-            } else if (options.isDirectory && !stat.isDirectory()) {
-              error = 'Not directory: ' + validPath;
-              return false;
-            } else if (options.min && stat.size < +options.min ||
-                options.max && stat.size > +options.max) {
-              error = 'Size ' + stat.size + ' is out of range: ' + validPath;
-              return false;
-            }
-          }
-          if (typeof options.validate === 'function' &&
-              (res = options.validate(validPath)) !== true) {
-            if (typeof res === 'string') { error = res; }
-            return false;
-          }
-        } catch (e) {
-          error = e + '';
+      try {
+        exists = fs.existsSync(value);
+        validPath = exists ? fs.realpathSync(value) : pathUtil.resolve(value);
+        // options.exists default: true, not-bool: no-check
+        if (!options.hasOwnProperty('exists') && !exists
+              || typeof options.exists === 'boolean' && options.exists !== exists) {
+          error = `${exists ? 'Already exists' : 'No such file or directory'
+          }: ${validPath}`;
           return false;
         }
-        return true;
-      },
-      // trueValue, falseValue, caseSensitive don't work.
-      phContent: function(param) {
-        return param === 'error' ? error :
-          param !== 'min' && param !== 'max' ? null :
-          options.hasOwnProperty(param) ? options[param] + '' : '';
+        if (!exists && options.create) {
+          if (options.isDirectory) {
+            mkdirParents(validPath);
+          } else {
+            mkdirParents(pathUtil.dirname(validPath));
+            fs.closeSync(fs.openSync(validPath, 'w')); // touch
+          }
+          validPath = fs.realpathSync(validPath);
+        }
+        if (exists && (options.min || options.max
+              || options.isFile || options.isDirectory)) {
+          stat = fs.statSync(validPath);
+          // type check first (directory has zero size)
+          if (options.isFile && !stat.isFile()) {
+            error = `Not file: ${validPath}`;
+            return false;
+          } if (options.isDirectory && !stat.isDirectory()) {
+            error = `Not directory: ${validPath}`;
+            return false;
+          } if (options.min && stat.size < +options.min
+                || options.max && stat.size > +options.max) {
+            error = `Size ${stat.size} is out of range: ${validPath}`;
+            return false;
+          }
+        }
+        if (typeof options.validate === 'function'
+              && (res = options.validate(validPath)) !== true) {
+          if (typeof res === 'string') { error = res; }
+          return false;
+        }
+      } catch (e) {
+        error = `${e}`;
+        return false;
       }
-    });
+      return true;
+    },
+    // trueValue, falseValue, caseSensitive don't work.
+    phContent(param) {
+      return param === 'error' ? error
+        : param !== 'min' && param !== 'max' ? null
+          : options.hasOwnProperty(param) ? `${options[param]}` : '';
+    },
+  });
     // added:     exists, create, min, max, isFile, isDirectory, validate
   /* eslint-enable key-spacing */
   options = options || {};
@@ -1103,56 +1108,55 @@ exports.questionPath = function(query, options) {
 
 // props: preCheck, args, hRes, limit
 function getClHandler(commandHandler, options) {
-  var clHandler = {},
-    hIndex = {};
+  const clHandler = {};
+  const hIndex = {};
   if (typeof commandHandler === 'object') {
-    Object.keys(commandHandler).forEach(function(cmd) {
+    Object.keys(commandHandler).forEach((cmd) => {
       if (typeof commandHandler[cmd] === 'function') {
         hIndex[options.caseSensitive ? cmd : cmd.toLowerCase()] = commandHandler[cmd];
       }
     });
-    clHandler.preCheck = function(res) {
-      var cmdKey;
+    clHandler.preCheck = function (res) {
+      let cmdKey;
       clHandler.args = parseCl(res);
       cmdKey = clHandler.args[0] || '';
       if (!options.caseSensitive) { cmdKey = cmdKey.toLowerCase(); }
-      clHandler.hRes =
-        cmdKey !== '_' && hIndex.hasOwnProperty(cmdKey)
-          ? hIndex[cmdKey].apply(res, clHandler.args.slice(1)) :
-          hIndex.hasOwnProperty('_') ? hIndex._.apply(res, clHandler.args) : null;
-      return {res: res, forceNext: false};
+      clHandler.hRes = cmdKey !== '_' && hIndex.hasOwnProperty(cmdKey)
+        ? hIndex[cmdKey].apply(res, clHandler.args.slice(1))
+        : hIndex.hasOwnProperty('_') ? hIndex._.apply(res, clHandler.args) : null;
+      return { res, forceNext: false };
     };
     if (!hIndex.hasOwnProperty('_')) {
-      clHandler.limit = function() { // It's called after preCheck.
-        var cmdKey = clHandler.args[0] || '';
+      clHandler.limit = function () { // It's called after preCheck.
+        let cmdKey = clHandler.args[0] || '';
         if (!options.caseSensitive) { cmdKey = cmdKey.toLowerCase(); }
         return hIndex.hasOwnProperty(cmdKey);
       };
     }
   } else {
-    clHandler.preCheck = function(res) {
+    clHandler.preCheck = function (res) {
       clHandler.args = parseCl(res);
       clHandler.hRes = typeof commandHandler === 'function'
         ? commandHandler.apply(res, clHandler.args) : true; // true for break loop
-      return {res: res, forceNext: false};
+      return { res, forceNext: false };
     };
   }
   return clHandler;
 }
 
-exports.promptCL = function(commandHandler, options) {
+exports.promptCL = function (commandHandler, options) {
   /* eslint-disable key-spacing */
-  var readOptions = mergeOptions({
-      // -------- default
-      hideEchoBack:       false,
-      limitMessage:       'Requested command is not available.',
-      caseSensitive:      false,
-      history:            true
-    }, options),
+  const readOptions = mergeOptions({
+    // -------- default
+    hideEchoBack:       false,
+    limitMessage:       'Requested command is not available.',
+    caseSensitive:      false,
+    history:            true,
+  }, options);
     //   -------- forced
     //   trueValue, falseValue, keepWhitespace don't work.
     //   preCheck, limit (by clHandler)
-    clHandler = getClHandler(commandHandler, readOptions);
+  const clHandler = getClHandler(commandHandler, readOptions);
   /* eslint-enable key-spacing */
   readOptions.limit = clHandler.limit;
   readOptions.preCheck = clHandler.preCheck;
@@ -1160,34 +1164,34 @@ exports.promptCL = function(commandHandler, options) {
   return clHandler.args;
 };
 
-exports.promptLoop = function(inputHandler, options) {
+exports.promptLoop = function (inputHandler, options) {
   /* eslint-disable key-spacing */
-  var readOptions = mergeOptions({
+  const readOptions = mergeOptions({
     // -------- default
     hideEchoBack:       false,
     trueValue:          null,
     falseValue:         null,
     caseSensitive:      false,
-    history:            true
+    history:            true,
   }, options);
   /* eslint-enable key-spacing */
   while (true) { if (inputHandler(exports.prompt(readOptions))) { break; } }
   // return; // nothing is returned
 };
 
-exports.promptCLLoop = function(commandHandler, options) {
+exports.promptCLLoop = function (commandHandler, options) {
   /* eslint-disable key-spacing */
-  var readOptions = mergeOptions({
-      // -------- default
-      hideEchoBack:       false,
-      limitMessage:       'Requested command is not available.',
-      caseSensitive:      false,
-      history:            true
-    }, options),
+  const readOptions = mergeOptions({
+    // -------- default
+    hideEchoBack:       false,
+    limitMessage:       'Requested command is not available.',
+    caseSensitive:      false,
+    history:            true,
+  }, options);
     //   -------- forced
     //   trueValue, falseValue, keepWhitespace don't work.
     //   preCheck, limit (by clHandler)
-    clHandler = getClHandler(commandHandler, readOptions);
+  const clHandler = getClHandler(commandHandler, readOptions);
   /* eslint-enable key-spacing */
   readOptions.limit = clHandler.limit;
   readOptions.preCheck = clHandler.preCheck;
@@ -1198,107 +1202,107 @@ exports.promptCLLoop = function(commandHandler, options) {
   // return; // nothing is returned
 };
 
-exports.promptSimShell = function(options) {
+exports.promptSimShell = function (options) {
   /* eslint-disable key-spacing */
   return exports.prompt(mergeOptions({
     // -------- default
     hideEchoBack:       false,
-    history:            true
+    history:            true,
   }, options, {
     // -------- forced
-    prompt:             (function() {
-      return IS_WIN ? '$<cwd>>' :
+    prompt:             (function () {
+      return IS_WIN ? '$<cwd>>'
         // 'user@host:cwd$ '
-        (process.env.USER || '') +
-        (process.env.HOSTNAME ? '@' + process.env.HOSTNAME.replace(/\..*$/, '') : '') +
-        ':$<cwdHome>$ ';
-    })()
+        : `${(process.env.USER || '')
+        + (process.env.HOSTNAME ? `@${process.env.HOSTNAME.replace(/\..*$/, '')}` : '')
+        }:$<cwdHome>$ `;
+    }()),
   }));
   /* eslint-enable key-spacing */
 };
 
 function _keyInYN(query, options, limit) {
-  var res;
+  let res;
   if (query == null) { query = 'Are you sure? '; }
   if ((!options || options.guide !== false) && (query += '')) {
-    query = query.replace(/\s*:?\s*$/, '') + ' [y/n]: ';
+    query = `${query.replace(/\s*:?\s*$/, '')} [y/n]: `;
   }
   /* eslint-disable key-spacing */
   res = exports.keyIn(query, mergeOptions(options, {
     // -------- forced
     hideEchoBack:       false,
-    limit:              limit,
+    limit,
     trueValue:          'y',
     falseValue:         'n',
-    caseSensitive:      false
+    caseSensitive:      false,
     // mask doesn't work.
   }));
   // added:     guide
   /* eslint-enable key-spacing */
   return typeof res === 'boolean' ? res : '';
 }
-exports.keyInYN = function(query, options) { return _keyInYN(query, options); };
-exports.keyInYNStrict = function(query, options) { return _keyInYN(query, options, 'yn'); };
+exports.keyInYN = function (query, options) { return _keyInYN(query, options); };
+exports.keyInYNStrict = function (query, options) { return _keyInYN(query, options, 'yn'); };
 
-exports.keyInPause = function(query, options) {
+exports.keyInPause = function (query, options) {
   if (query == null) { query = 'Continue...'; }
   if ((!options || options.guide !== false) && (query += '')) {
-    query = query.replace(/\s+$/, '') + ' (Hit any key)';
+    query = `${query.replace(/\s+$/, '')} (Hit any key)`;
   }
   /* eslint-disable key-spacing */
   exports.keyIn(query, mergeOptions({
     // -------- default
-    limit:              null
+    limit:              null,
   }, options, {
     // -------- forced
     hideEchoBack:       true,
-    mask:               ''
+    mask:               '',
   }));
   // added:     guide
   /* eslint-enable key-spacing */
   // return; // nothing is returned
 };
 
-exports.keyInSelect = function(items, query, options) {
+exports.keyInSelect = function (items, query, options) {
   /* eslint-disable key-spacing */
-  var readOptions = mergeOptions({
-      // -------- default
-      hideEchoBack:       false
-    }, options, {
-      // -------- forced
-      trueValue:          null,
-      falseValue:         null,
-      caseSensitive:      false,
-      // limit (by items),
-      phContent: function(param) {
-        return param === 'itemsCount' ? items.length + '' :
-          param === 'firstItem' ? (items[0] + '').trim() :
-          param === 'lastItem' ? (items[items.length - 1] + '').trim() : null;
-      }
-    }),
+  const readOptions = mergeOptions({
+    // -------- default
+    hideEchoBack:       false,
+  }, options, {
+    // -------- forced
+    trueValue:          null,
+    falseValue:         null,
+    caseSensitive:      false,
+    // limit (by items),
+    phContent(param) {
+      return param === 'itemsCount' ? `${items.length}`
+        : param === 'firstItem' ? (`${items[0]}`).trim()
+          : param === 'lastItem' ? (`${items[items.length - 1]}`).trim() : null;
+    },
+  });
     // added:     guide, cancel
-    keylist = '',
-    key2i = {},
-    charCode = 49 /* '1' */,
-    display = '\n';
+  let keylist = '';
+  const key2i = {};
+  let charCode = 49;
+  let display = '\n';
   /* eslint-enable key-spacing */
   if (!Array.isArray(items) || !items.length || items.length > 35) {
     throw '`items` must be Array (max length: 35).';
   }
 
-  items.forEach(function(item, i) {
-    var key = String.fromCharCode(charCode);
+  items.forEach((item, i) => {
+    const key = String.fromCharCode(charCode);
     keylist += key;
     key2i[key] = i;
-    display += '[' + key + '] ' + (item + '').trim() + '\n';
+    display += `[${key}] ${(`${item}`).trim()}\n`;
     charCode = charCode === 57 /* '9' */ ? 97 /* 'a' */ : charCode + 1;
   });
   if (!options || options.cancel !== false) {
     keylist += '0';
     key2i['0'] = -1;
-    display += '[0] ' +
-      (options && options.cancel != null && typeof options.cancel !== 'boolean'
-        ? (options.cancel + '').trim() : 'CANCEL') + '\n';
+    display += `[0] ${
+      options && options.cancel != null && typeof options.cancel !== 'boolean'
+        ? (`${options.cancel}`).trim() : 'CANCEL'}\n`;
   }
   readOptions.limit = keylist;
   display += '\n';
@@ -1306,7 +1310,7 @@ exports.keyInSelect = function(items, query, options) {
   if (query == null) { query = 'Choose one from list: '; }
   if ((query += '')) {
     if (!options || options.guide !== false) {
-      query = query.replace(/\s*:?\s*$/, '') + ' [$<limit>]: ';
+      query = `${query.replace(/\s*:?\s*$/, '')} [$<limit>]: `;
     }
     display += query;
   }
@@ -1314,16 +1318,16 @@ exports.keyInSelect = function(items, query, options) {
   return key2i[exports.keyIn(display, readOptions).toLowerCase()];
 };
 
-exports.getRawInput = function() { return rawInput; };
+exports.getRawInput = function () { return rawInput; };
 
 // ======== DEPRECATED ========
 function _setOption(optionName, args) {
-  var options;
+  let options;
   if (args.length) { options = {}; options[optionName] = args[0]; }
   return exports.setDefaultOptions(options)[optionName];
 }
-exports.setPrint = function() { return _setOption('print', arguments); };
-exports.setPrompt = function() { return _setOption('prompt', arguments); };
-exports.setEncoding = function() { return _setOption('encoding', arguments); };
-exports.setMask = function() { return _setOption('mask', arguments); };
-exports.setBufferSize = function() { return _setOption('bufferSize', arguments); };
+exports.setPrint = function () { return _setOption('print', arguments); };
+exports.setPrompt = function () { return _setOption('prompt', arguments); };
+exports.setEncoding = function () { return _setOption('encoding', arguments); };
+exports.setMask = function () { return _setOption('mask', arguments); };
+exports.setBufferSize = function () { return _setOption('bufferSize', arguments); };

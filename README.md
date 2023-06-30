@@ -13,6 +13,10 @@
 Требования:
 node.js последней версии
 
+Установка:
+make install
+
+Asciinema демонстрации:
 5 step demonstration: https://asciinema.org/a/1otG9d1tQLiv3GHKhB2CjRi1F
 6 step demonstrarion: https://asciinema.org/a/aBDVW3MDDCd8JyPiPM5R8iJgM
 7 step demonstrarion: https://asciinema.org/a/uFI0A6gYLUfQ6DQxQL9KT4k2k

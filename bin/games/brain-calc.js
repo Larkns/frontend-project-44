@@ -12,20 +12,20 @@ const calc = () => {
   let mathOperation;
 
   switch (randomMathOperationIndex) {
-  case 0:
-    mathOperation = '+';
-    result.correctGameAnswer = randomNumber1 + randomNumber2;
-    break;
-  case 1:
-    mathOperation = '-';
-    result.correctGameAnswer = randomNumber1 - randomNumber2;
-    break;
-  case 2:
-    mathOperation = '*';
-    result.correctGameAnswer = randomNumber1 * randomNumber2;
-    break;
-  default:
-    console.log('Error');
+    case 0:
+      mathOperation = '+';
+      result.correctGameAnswer = randomNumber1 + randomNumber2;
+      break;
+    case 1:
+      mathOperation = '-';
+      result.correctGameAnswer = randomNumber1 - randomNumber2;
+      break;
+    case 2:
+      mathOperation = '*';
+      result.correctGameAnswer = randomNumber1 * randomNumber2;
+      break;
+    default:
+      console.log('Error');
   }
 
   console.log(`Question: ${randomNumber1} ${mathOperation} ${randomNumber2}`);
